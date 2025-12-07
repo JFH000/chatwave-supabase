@@ -32,9 +32,22 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Create a .env file with your configuration
+# See ENV_SETUP.md for details
+cp ENV_SETUP.md .env  # Edit .env with your actual values
+
+# Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
+
+## Configuration
+
+This project requires environment variables to be set. See [ENV_SETUP.md](./ENV_SETUP.md) for detailed configuration instructions.
+
+**Required variables:**
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Your Supabase anon key
+- `VITE_N8N_WEBHOOK_URL` - Your n8n webhook URL for chat processing
 
 **Edit a file directly in GitHub**
 
@@ -59,6 +72,8 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (Database, Auth, Storage)
+- n8n (Workflow automation for chat processing)
 
 ## How can I deploy this project?
 
