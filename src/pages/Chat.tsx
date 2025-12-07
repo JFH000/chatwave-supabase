@@ -1357,6 +1357,8 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
 
       // Second: Call description webhook after image is processed and shown
       let descriptionText = "";
+      let productTitle = "";
+      let productDescription = "";
       try {
         const descriptionResponse = await fetch(descriptionWebhookUrl, {
           method: "POST",
@@ -1393,10 +1395,14 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
                   
                   if (title && description) {
                     descriptionText = `**${title}**\n\n${description}`;
+                    productTitle = title;
+                    productDescription = description;
                   } else if (title) {
                     descriptionText = `**${title}**`;
+                    productTitle = title;
                   } else if (description) {
                     descriptionText = description;
+                    productDescription = description;
                   }
                 } else if (firstItem.title || firstItem.description) {
                   // Direct structure in array: [{"title": "...", "description": "..."}]
@@ -1405,10 +1411,14 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
                   
                   if (title && description) {
                     descriptionText = `**${title}**\n\n${description}`;
+                    productTitle = title;
+                    productDescription = description;
                   } else if (title) {
                     descriptionText = `**${title}**`;
+                    productTitle = title;
                   } else if (description) {
                     descriptionText = description;
+                    productDescription = description;
                   }
                 }
               } else if (typeof descriptionData === "object" && descriptionData !== null) {
@@ -1424,10 +1434,14 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
                   
                   if (title && description) {
                     descriptionText = `**${title}**\n\n${description}`;
+                    productTitle = title;
+                    productDescription = description;
                   } else if (title) {
                     descriptionText = `**${title}**`;
+                    productTitle = title;
                   } else if (description) {
                     descriptionText = description;
+                    productDescription = description;
                   }
                 } else if (data.output) {
                   // Structure: {"output": {"title": "...", "description": "..."}}
@@ -1439,10 +1453,14 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
                   
                   if (title && description) {
                     descriptionText = `**${title}**\n\n${description}`;
+                    productTitle = title;
+                    productDescription = description;
                   } else if (title) {
                     descriptionText = `**${title}**`;
+                    productTitle = title;
                   } else if (description) {
                     descriptionText = description;
+                    productDescription = description;
                   }
                 } else {
                   console.warn("Unknown description data structure:", data);
@@ -1505,6 +1523,131 @@ Al final, pregúntale si quiere seguir con la creación de su imagen principal p
       } else {
         console.warn("No description text to save - descriptionText is empty or whitespace");
         console.warn("descriptionText value:", descriptionText);
+      }
+
+      // Third: Call MercadoLibre webhook after image and description are processed
+      const mercadoLibreWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_MERCADO_LIBRE;
+      
+      if (mercadoLibreWebhookUrl && productTitle && productDescription) {
+        try {
+          // Show "creando publicacion en mercado libre" message
+          const creatingMessage = "Creando publicación en MercadoLibre...";
+          const { data: creatingMsg, error: creatingMsgError } = await supabase
+            .from("messages")
+            .insert({
+              chat_id: chatId,
+              user_id: user!.id,
+              role: "assistant",
+              content: creatingMessage,
+            })
+            .select()
+            .single();
+
+          if (!creatingMsgError && creatingMsg) {
+            setMessages((prev) => [
+              ...prev,
+              { 
+                id: creatingMsg.id, 
+                role: "assistant", 
+                content: creatingMessage
+              },
+            ]);
+          }
+
+          // Get image in base64 format
+          // Use the processed image if available, otherwise use the original
+          let imageBase64 = fileBase64;
+          let imageMimeType = "image/jpeg";
+          let imageFileName = "imagen1.jpg";
+
+          // Try to get the processed image if it's a blob
+          if (imageBlob) {
+            try {
+              const blobBase64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64String = reader.result as string;
+                  const base64Data = base64String.includes(",") ? base64String.split(",")[1] : base64String;
+                  resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(imageBlob!);
+              });
+              imageBase64 = blobBase64;
+              imageMimeType = imageBlob.type || "image/jpeg";
+              // Keep simple filename as per specification
+              imageFileName = imageMimeType.includes("jpeg") || imageMimeType.includes("jpg") ? "imagen1.jpg" : "imagen1.png";
+            } catch (error) {
+              console.error("Error converting blob to base64:", error);
+            }
+          } else if (isBase64 && responseImageUrl) {
+            // If it's already base64, extract it
+            imageBase64 = responseImageUrl.includes(",") ? responseImageUrl.split(",")[1] : responseImageUrl;
+            imageMimeType = "image/jpeg";
+            imageFileName = "imagen1.jpg";
+          }
+
+          // Prepare MercadoLibre webhook body - exact structure as specified
+          const mercadoLibreBody = {
+            title: productTitle || "Producto XYZ2",
+            description: productDescription || "Descripción generada automáticamente",
+            price: 159900,
+            category_id: "MCO5072",
+            quantity: 10,
+            currency_id: "COP",
+            images: [
+              {
+                fileName: imageFileName,
+                mimeType: imageMimeType,
+                data: imageBase64
+              }
+            ]
+          };
+
+          // Log the request details
+          console.log("=== Llamando a webhook de MercadoLibre ===");
+          console.log("URL:", mercadoLibreWebhookUrl);
+          console.log("Body completo:", mercadoLibreBody);
+          console.log("Título:", mercadoLibreBody.title);
+          console.log("Descripción:", mercadoLibreBody.description);
+          console.log("Precio:", mercadoLibreBody.price);
+          console.log("Categoría:", mercadoLibreBody.category_id);
+          console.log("Cantidad:", mercadoLibreBody.quantity);
+          console.log("Moneda:", mercadoLibreBody.currency_id);
+          console.log("Imagen - Nombre:", mercadoLibreBody.images[0].fileName);
+          console.log("Imagen - Tipo MIME:", mercadoLibreBody.images[0].mimeType);
+          console.log("Imagen - Base64 (primeros 100 caracteres):", mercadoLibreBody.images[0].data.substring(0, 100) + "...");
+
+          // Call MercadoLibre webhook
+          const mercadoLibreResponse = await fetch(mercadoLibreWebhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(mercadoLibreBody),
+          });
+
+          console.log("=== Respuesta del webhook de MercadoLibre ===");
+          console.log("Status:", mercadoLibreResponse.status);
+          console.log("Status Text:", mercadoLibreResponse.statusText);
+          console.log("Headers:", Object.fromEntries(mercadoLibreResponse.headers.entries()));
+
+          if (!mercadoLibreResponse.ok) {
+            const errorText = await mercadoLibreResponse.text();
+            console.error("Error en la respuesta:", errorText);
+          } else {
+            try {
+              const responseData = await mercadoLibreResponse.json();
+              console.log("Respuesta exitosa (JSON):", JSON.stringify(responseData, null, 2));
+            } catch {
+              const responseText = await mercadoLibreResponse.text();
+              console.log("Respuesta exitosa (texto):", responseText);
+            }
+          }
+        } catch (error) {
+          console.error("Error calling MercadoLibre webhook:", error);
+          // Don't throw, just log the error
+        }
       }
 
     } catch (error) {
